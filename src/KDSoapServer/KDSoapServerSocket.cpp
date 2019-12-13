@@ -458,7 +458,7 @@ void KDSoapServerSocket::writeXML(const QByteArray &xmlResponse, bool isFault)
     // flush() ?
 }
 
-void KDSoapServerSocket::sendReply(KDSoapServerObjectInterface *serverObjectInterface, const KDSoapMessage &replyMsg)
+void KDSoapServerSocket::sendReply(KDSoapServerObjectInterface *serverObjectInterface, const KDSoapMessage &replyMsg, const QString &action)
 {
     const bool isFault = replyMsg.isFault();
 
@@ -480,7 +480,7 @@ void KDSoapServerSocket::sendReply(KDSoapServerObjectInterface *serverObjectInte
             }
         }
         msgWriter.setMessageNamespace(responseNamespace);
-        xmlResponse = msgWriter.messageToXml(replyMsg, responseName, responseHeaders, QMap<QString, KDSoapMessage>());
+        xmlResponse = msgWriter.messageToXml(replyMsg, responseName, responseHeaders, QMap<QString, KDSoapMessage>(), action);
     }
 
     writeXML(xmlResponse, isFault);
@@ -501,9 +501,10 @@ void KDSoapServerSocket::sendReply(KDSoapServerObjectInterface *serverObjectInte
     }
 }
 
-void KDSoapServerSocket::sendDelayedReply(KDSoapServerObjectInterface *serverObjectInterface, const KDSoapMessage &replyMsg)
+void KDSoapServerSocket::sendDelayedReply(KDSoapServerObjectInterface *serverObjectInterface,
+                                          const KDSoapMessage &replyMsg, const QString &action)
 {
-    sendReply(serverObjectInterface, replyMsg);
+    sendReply(serverObjectInterface, replyMsg, action);
     m_delayedResponse = false;
     setSocketEnabled(true);
 }

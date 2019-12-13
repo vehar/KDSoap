@@ -52,8 +52,10 @@ public:
     ~KDSoapServerSocket();
 
     void setResponseDelayed();
-    void sendDelayedReply(KDSoapServerObjectInterface *serverObjectInterface, const KDSoapMessage &replyMsg);
-    void sendReply(KDSoapServerObjectInterface *serverObjectInterface, const KDSoapMessage &replyMsg);
+    void sendDelayedReply(KDSoapServerObjectInterface *serverObjectInterface,
+                          const KDSoapMessage &replyMsg, const QString &action = QString());
+    void sendReply(KDSoapServerObjectInterface *serverObjectInterface,
+                   const KDSoapMessage &replyMsg, const QString &action = QString());
 Q_SIGNALS:
     void socketDeleted(KDSoapServerSocket *);
 

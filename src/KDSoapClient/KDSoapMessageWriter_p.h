@@ -51,12 +51,16 @@ public:
     QByteArray messageToXml(const KDSoapMessage &message, const QString &method /*empty in document style*/,
                             const KDSoapHeaders &headers,
                             const QMap<QString, KDSoapMessage> &persistentHeaders,
+                            const QString &action,
                             const KDSoapAuthentication &authentication = KDSoapAuthentication()) const;
+
+    bool useWsAddressing() const;
+    void setUseWsAddressing(bool useWsAddressing);
 
 private:
     QString m_messageNamespace;
     KDSoap::SoapVersion m_version;
-
+    bool m_useWsAddressing;
 };
 
 #endif // KDSOAPMESSAGEWRITER_P_H

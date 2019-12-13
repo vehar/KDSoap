@@ -29,7 +29,8 @@
 #include <QDebug>
 
 KDSoapMessageWriter::KDSoapMessageWriter()
-    : m_version(KDSoap::SOAP1_1)
+    : m_version(KDSoap::SOAP1_1),
+      m_useWsAddressing(false)
 {
 }
 
@@ -45,7 +46,7 @@ void KDSoapMessageWriter::setMessageNamespace(const QString &ns)
 
 QByteArray KDSoapMessageWriter::messageToXml(const KDSoapMessage &message, const QString &method,
         const KDSoapHeaders &headers, const QMap<QString, KDSoapMessage> &persistentHeaders,
-        const KDSoapAuthentication &authentication) const
+        const QString &action, const KDSoapAuthentication &authentication) const
 {
     QByteArray data;
     QXmlStreamWriter writer(&data);
@@ -74,7 +75,11 @@ QByteArray KDSoapMessageWriter::messageToXml(const KDSoapMessage &message, const
         messageNamespace = message.namespaceUri();
     }
 
-    if (!headers.isEmpty() || !persistentHeaders.isEmpty() || message.hasMessageAddressingProperties() || authentication.hasWSUsernameTokenHeader()) {
+    if (!headers.isEmpty()
+            || !persistentHeaders.isEmpty()
+            || message.hasMessageAddressingProperties()
+            || authentication.hasWSUsernameTokenHeader()
+            || m_useWsAddressing) {
         // This writeNamespace line adds the xmlns:n1 to <Envelope>, which looks ugly and unusual (and breaks all unittests)
         // However it's the best solution in case of headers, otherwise we get n1 in the header and n2 in the body,
         // and xsi:type attributes that refer to n1, which isn't defined in the body...
@@ -86,6 +91,15 @@ QByteArray KDSoapMessageWriter::messageToXml(const KDSoapMessage &message, const
         Q_FOREACH (const KDSoapMessage &header, headers) {
             header.writeChildren(namespacePrefixes, writer, header.use(), messageNamespace, true);
         }
+
+        if (m_useWsAddressing) {
+            KDSoapMessage actionHeader;
+            actionHeader.addArgument(QString::fromLatin1("Action"), action);
+            actionHeader.setNamespaceUri(QString::fromLatin1("http://www.w3.org/2005/08/addressing"));
+            actionHeader.writeChildren(namespacePrefixes, writer, actionHeader.use(),
+                                       QString::fromLatin1("http://www.w3.org/2005/08/addressing"), true);
+        }
+
         if (message.hasMessageAddressingProperties()) {
             message.messageAddressingProperties().writeMessageAddressingProperties(namespacePrefixes, writer, messageNamespace, true);
         }
@@ -127,4 +141,14 @@ QByteArray KDSoapMessageWriter::messageToXml(const KDSoapMessage &message, const
     writer.writeEndDocument();
 
     return data;
+}
+
+bool KDSoapMessageWriter::useWsAddressing() const
+{
+    return m_useWsAddressing;
+}
+
+void KDSoapMessageWriter::setUseWsAddressing(bool useWsAddressing)
+{
+    m_useWsAddressing = useWsAddressing;
 }

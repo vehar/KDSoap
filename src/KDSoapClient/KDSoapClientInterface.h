@@ -346,6 +346,9 @@ public:
       */
     void setTimeout(int msecs);
 
+    bool useWsAddressing() const;
+    void setUseWsAddressing(bool useWsAddressing);
+
 private:
     friend class KDSoapThreadTask;
 

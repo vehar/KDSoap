@@ -69,7 +69,8 @@ KDSoapClientInterfacePrivate::KDSoapClientInterfacePrivate()
       m_version(KDSoap::SOAP1_1),
       m_style(KDSoapClientInterface::RPCStyle),
       m_ignoreSslErrors(false),
-      m_timeout(30 * 60 * 1000) // 30 minutes, as documented
+      m_timeout(30 * 60 * 1000), // 30 minutes, as documented
+      m_useWsAddressing(false)
 {
 #ifndef QT_NO_OPENSSL
     m_sslHandler = nullptr;
@@ -116,7 +117,9 @@ QNetworkRequest KDSoapClientInterfacePrivate::prepareRequest(const QString &meth
         soapHeader += QString::fromLatin1("text/xml;charset=utf-8");
         request.setRawHeader("SoapAction", '\"' + soapAction.toUtf8() + '\"');
     } else if (m_version == KDSoap::SOAP1_2) {
-        soapHeader += QString::fromLatin1("application/soap+xml;charset=utf-8;action=") + soapAction;
+        soapHeader += QString::fromLatin1("application/soap+xml;charset=utf-8;");
+        if (!m_useWsAddressing)
+            soapHeader += QString::fromLatin1("action=") + soapAction;
     }
 
     request.setHeader(QNetworkRequest::ContentTypeHeader, soapHeader.toUtf8());
@@ -142,12 +145,17 @@ QNetworkRequest KDSoapClientInterfacePrivate::prepareRequest(const QString &meth
     return request;
 }
 
-QBuffer *KDSoapClientInterfacePrivate::prepareRequestBuffer(const QString &method, const KDSoapMessage &message, const KDSoapHeaders &headers)
+QBuffer *KDSoapClientInterfacePrivate::prepareRequestBuffer(const QString &method, const KDSoapMessage &message,
+                                                            const KDSoapHeaders &headers, const QString &action)
 {
     KDSoapMessageWriter msgWriter;
     msgWriter.setMessageNamespace(m_messageNamespace);
     msgWriter.setVersion(m_version);
-    const QByteArray data = msgWriter.messageToXml(message, (m_style == KDSoapClientInterface::RPCStyle) ? method : QString(), headers, m_persistentHeaders, m_authentication);
+    msgWriter.setUseWsAddressing(m_useWsAddressing);
+    const QByteArray data = msgWriter.messageToXml(message,
+                                                   (m_style == KDSoapClientInterface::RPCStyle) ? method : QString(),
+                                                   headers, m_persistentHeaders,
+                                                   action, m_authentication);
     QBuffer *buffer = new QBuffer;
     buffer->setData(data);
     buffer->open(QIODevice::ReadOnly);
@@ -156,7 +164,7 @@ QBuffer *KDSoapClientInterfacePrivate::prepareRequestBuffer(const QString &metho
 
 KDSoapPendingCall KDSoapClientInterface::asyncCall(const QString &method, const KDSoapMessage &message, const QString &soapAction, const KDSoapHeaders &headers)
 {
-    QBuffer *buffer = d->prepareRequestBuffer(method, message, headers);
+    QBuffer *buffer = d->prepareRequestBuffer(method, message, headers, soapAction);
     QNetworkRequest request = d->prepareRequest(method, soapAction);
     QNetworkReply *reply = d->accessManager()->post(request, buffer);
     d->setupReply(reply);
@@ -187,7 +195,7 @@ KDSoapMessage KDSoapClientInterface::call(const QString &method, const KDSoapMes
 
 void KDSoapClientInterface::callNoReply(const QString &method, const KDSoapMessage &message, const QString &soapAction, const KDSoapHeaders &headers)
 {
-    QBuffer *buffer = d->prepareRequestBuffer(method, message, headers);
+    QBuffer *buffer = d->prepareRequestBuffer(method, message, headers, soapAction);
     QNetworkRequest request = d->prepareRequest(method, soapAction);
     QNetworkReply *reply = d->accessManager()->post(request, buffer);
     d->setupReply(reply);
@@ -284,6 +292,16 @@ void KDSoapClientInterfacePrivate::setupReply(QNetworkReply *reply)
     }
 }
 
+bool KDSoapClientInterfacePrivate::useWsAddressing() const
+{
+    return m_useWsAddressing;
+}
+
+void KDSoapClientInterfacePrivate::setUseWsAddressing(bool useWsAddressing)
+{
+    m_useWsAddressing = useWsAddressing;
+}
+
 KDSoapHeaders KDSoapClientInterface::lastResponseHeaders() const
 {
     return d->m_lastResponseHeaders;
@@ -334,6 +352,16 @@ int KDSoapClientInterface::timeout() const
 void KDSoapClientInterface::setTimeout(int msecs)
 {
     d->m_timeout = msecs;
+}
+
+bool KDSoapClientInterface::useWsAddressing() const
+{
+    return d->useWsAddressing();
+}
+
+void KDSoapClientInterface::setUseWsAddressing(bool useWsAddressing)
+{
+    d->setUseWsAddressing(useWsAddressing);
 }
 
 #ifndef QT_NO_OPENSSL
