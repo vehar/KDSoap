@@ -63,10 +63,12 @@ public:
     KDSoapSslHandler *m_sslHandler;
 #endif
     int m_timeout;
+    bool m_sendHTTPActionParameter = true;
+    bool m_sendSOAPActionInWSAAction = false;
 
     QNetworkAccessManager *accessManager();
     QNetworkRequest prepareRequest(const QString &method, const QString &action);
-    QBuffer *prepareRequestBuffer(const QString &method, const KDSoapMessage &message, const KDSoapHeaders &headers);
+    QBuffer *prepareRequestBuffer(const QString &method, const KDSoapMessage &message, const QString &soapAction, const KDSoapHeaders &headers);
     void writeElementContents(KDSoapNamespacePrefixes &namespacePrefixes, QXmlStreamWriter &writer, const KDSoapValue &element, KDSoapMessage::Use use);
     void writeChildren(KDSoapNamespacePrefixes &namespacePrefixes, QXmlStreamWriter &writer, const KDSoapValueList &args, KDSoapMessage::Use use);
     void writeAttributes(QXmlStreamWriter &writer, const QList<KDSoapValue> &attributes);

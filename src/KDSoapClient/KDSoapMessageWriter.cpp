@@ -128,3 +128,4 @@ QByteArray KDSoapMessageWriter::messageToXml(const KDSoapMessage &message, const
 
     return data;
 }
+

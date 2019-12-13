@@ -426,6 +426,43 @@ private Q_SLOTS:
         }
     }
 
+    // Test if the setClientSendsActionInHttpHeader is set false in the client then the SOAP action
+    // is really not placed into the Content-Type HTTP header
+    void testSetClientSendsActionInHttpHeader()
+    {
+        HttpServerThread server(countryResponse(), HttpServerThread::Public);
+        server.setClientSendsActionInHttpHeader(false);
+
+        qDebug() << "server ready, proceeding" << server.endPoint();
+        KDSoapClientInterface client(server.endPoint(), countryMessageNamespace());
+        client.setSendHTTPActionParameter(false);
+        client.setSoapVersion(KDSoapClientInterface::SOAP1_2);
+        QString action = QStringLiteral("http://localhost/getEmployeeCountry");
+        server.setExpectedSoapAction(action);
+        KDSoapMessage ret= client.call(QStringLiteral("getEmployeeCountry"), countryMessage(), action);
+        QVERIFY(!ret.isFault());
+        QVERIFY(xmlBufferCompare(server.receivedData(), expectedCountryRequest12()));
+        QCOMPARE(server.header("Content-Type").constData(), "application/soap+xml;charset=utf-8");
+    }
+
+    // Test if the setSendSOAPActionInWSAAction is set true in the client then the SOAP action
+    // is really placed in the SOAP envelope's header section
+    void testSendSoapActionWithWSAddressing()
+    {
+        HttpServerThread server(countryResponse(), HttpServerThread::Public);
+
+        qDebug() << "server ready, proceeding" << server.endPoint();
+        KDSoapClientInterface client(server.endPoint(), countryMessageNamespace());
+        client.setSendSOAPActionInWSAAction(true);
+        client.setSoapVersion(KDSoapClientInterface::SOAP1_2);
+        QString action = QStringLiteral("http://localhost/getEmployeeCountry");
+        server.setExpectedSoapAction(action);
+        KDSoapMessage ret= client.call(QStringLiteral("getEmployeeCountry"), countryMessage(), action);
+        QVERIFY(!ret.isFault());
+        QVERIFY(xmlBufferCompare(server.receivedData(), expectedCountryRequestWithWSAddressingAction()));
+    }
+
+    
 private:
     static QByteArray countryResponse()
     {
@@ -438,6 +475,25 @@ private:
         return QByteArray(xmlEnvBegin11()) +
                "><soap:Body>"
                "<n1:getEmployeeCountry xmlns:n1=\"http://www.kdab.com/xml/MyWsdl/\">"
+               "<employeeName>David Ä Faure</employeeName>"
+               "</n1:getEmployeeCountry>"
+               "</soap:Body>" + xmlEnvEnd();
+    }
+    static QByteArray expectedCountryRequest12()
+    {
+        return QByteArray(xmlEnvBegin12()) +
+               "><soap:Body>"
+               "<n1:getEmployeeCountry xmlns:n1=\"http://www.kdab.com/xml/MyWsdl/\">"
+               "<employeeName>David Ä Faure</employeeName>"
+               "</n1:getEmployeeCountry>"
+               "</soap:Body>" + xmlEnvEnd();
+    }
+    static QByteArray expectedCountryRequestWithWSAddressingAction()
+    {
+        return QByteArray(xmlEnvBegin12WithWSAddressing()) +
+               "><soap:Header><wsa:Action>http://localhost/getEmployeeCountry</wsa:Action></soap:Header>"
+               "<soap:Body>"
+               "<n1:getEmployeeCountry>"
                "<employeeName>David Ä Faure</employeeName>"
                "</n1:getEmployeeCountry>"
                "</soap:Body>" + xmlEnvEnd();
