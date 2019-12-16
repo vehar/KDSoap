@@ -64,6 +64,7 @@ public:
 #endif
     int m_timeout;
     bool m_useWsAddressing;
+    bool m_useGZIP = false;
 
     QNetworkAccessManager *accessManager();
     QNetworkRequest prepareRequest(const QString &method, const QString &action);
@@ -75,6 +76,8 @@ public:
 
     bool useWsAddressing() const;
     void setUseWsAddressing(bool useWsAddressing);
+
+    void setUseGZIP(bool useGZIP);
 
 private Q_SLOTS:
     void _kd_slotAuthenticationRequired(QNetworkReply *reply, QAuthenticator *authenticator);

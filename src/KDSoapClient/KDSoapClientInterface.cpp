@@ -33,10 +33,12 @@
 #include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QAuthenticator>
+#include <QDataStream>
 #include <QDebug>
 #include <QBuffer>
 #include <QNetworkProxy>
 #include <QTimer>
+#include "zlib.h"
 
 KDSoapClientInterface::KDSoapClientInterface(const QString &endPoint, const QString &messageNamespace)
     : d(new KDSoapClientInterfacePrivate)
@@ -84,6 +86,11 @@ KDSoapClientInterfacePrivate::~KDSoapClientInterfacePrivate()
 #endif
 }
 
+void KDSoapClientInterfacePrivate::setUseGZIP(bool useGZIP)
+{
+    m_useGZIP = useGZIP;
+}
+
 QNetworkAccessManager *KDSoapClientInterfacePrivate::accessManager()
 {
     if (!m_accessManager) {
@@ -114,10 +121,16 @@ QNetworkRequest KDSoapClientInterfacePrivate::prepareRequest(const QString &meth
 
     QString soapHeader;
     if (m_version == KDSoap::SOAP1_1) {
-        soapHeader += QString::fromLatin1("text/xml;charset=utf-8");
+        if (!m_useGZIP)
+            soapHeader += QString::fromLatin1("text/xml;charset=utf-8");
+        else
+            soapHeader += QStringLiteral("application/x-gzip");
         request.setRawHeader("SoapAction", '\"' + soapAction.toUtf8() + '\"');
     } else if (m_version == KDSoap::SOAP1_2) {
-        soapHeader += QString::fromLatin1("application/soap+xml;charset=utf-8;");
+        if (!m_useGZIP)
+            soapHeader += QString::fromLatin1("application/soap+xml;charset=utf-8;");
+        else
+            soapHeader += QStringLiteral("application/x-gzip");
         if (!m_useWsAddressing)
             soapHeader += QString::fromLatin1("action=") + soapAction;
     }
@@ -152,12 +165,37 @@ QBuffer *KDSoapClientInterfacePrivate::prepareRequestBuffer(const QString &metho
     msgWriter.setMessageNamespace(m_messageNamespace);
     msgWriter.setVersion(m_version);
     msgWriter.setUseWsAddressing(m_useWsAddressing);
-    const QByteArray data = msgWriter.messageToXml(message,
-                                                   (m_style == KDSoapClientInterface::RPCStyle) ? method : QString(),
-                                                   headers, m_persistentHeaders,
-                                                   action, m_authentication);
+    QByteArray data = msgWriter.messageToXml(message,
+                                             (m_style == KDSoapClientInterface::RPCStyle) ? method : QString(),
+                                             headers, m_persistentHeaders,
+                                             action, m_authentication);
     QBuffer *buffer = new QBuffer;
-    buffer->setData(data);
+    if (!m_useGZIP) {
+        buffer->setData(data);
+    } else {
+        QByteArray compressedData;
+        char *compressedDataBuffer = new char[data.size()];
+        z_stream defstream;
+        defstream.zalloc = nullptr;
+        defstream.zfree = nullptr;
+        defstream.opaque = nullptr;
+        defstream.avail_in = static_cast<uInt>(data.length());
+        defstream.next_in = reinterpret_cast<Bytef*>(data.data());
+        defstream.next_out = reinterpret_cast<Bytef*>(compressedDataBuffer);
+
+        deflateInit2(&defstream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 31, 8, Z_DEFAULT_STRATEGY);
+        buffer->open(QIODevice::WriteOnly);
+        do {
+            defstream.avail_out = static_cast<uInt>(data.length());
+            defstream.next_out = reinterpret_cast<Bytef*>(compressedDataBuffer);
+            deflate(&defstream, Z_FINISH);
+            if (defstream.avail_out)
+                buffer->write(compressedDataBuffer, static_cast<int>(defstream.avail_out));
+        } while (defstream.avail_out == 0);
+        deflateEnd(&defstream);
+        delete[] compressedDataBuffer;
+        buffer->close();
+    }
     buffer->open(QIODevice::ReadOnly);
     return buffer;
 }
@@ -362,6 +400,11 @@ bool KDSoapClientInterface::useWsAddressing() const
 void KDSoapClientInterface::setUseWsAddressing(bool useWsAddressing)
 {
     d->setUseWsAddressing(useWsAddressing);
+}
+
+void KDSoapClientInterface::setUseGZIP(bool use)
+{
+    d->setUseGZIP(use);
 }
 
 #ifndef QT_NO_OPENSSL

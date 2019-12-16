@@ -349,6 +349,8 @@ public:
     bool useWsAddressing() const;
     void setUseWsAddressing(bool useWsAddressing);
 
+    void setUseGZIP(bool use);
+
 private:
     friend class KDSoapThreadTask;
 

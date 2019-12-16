@@ -57,6 +57,23 @@ SOURCES = KDSoapMessage.cpp \
     KDSoapEndpointReference.cpp \
     KDQName.cpp \
 
+INCLUDEPATH = $${TOP_SOURCE_DIR}/zlib $$INCLUDEPATH
+SOURCES += \
+  $${TOP_SOURCE_DIR}/zlib/adler32.c \
+  $${TOP_SOURCE_DIR}/zlib/compress.c \
+  $${TOP_SOURCE_DIR}/zlib/crc32.c \
+  $${TOP_SOURCE_DIR}/zlib/deflate.c \
+  $${TOP_SOURCE_DIR}/zlib/gzclose.c \
+  $${TOP_SOURCE_DIR}/zlib/gzlib.c \
+  $${TOP_SOURCE_DIR}/zlib/gzread.c \
+  $${TOP_SOURCE_DIR}/zlib/gzwrite.c \
+  $${TOP_SOURCE_DIR}/zlib/infback.c \
+  $${TOP_SOURCE_DIR}/zlib/inffast.c \
+  $${TOP_SOURCE_DIR}/zlib/inflate.c \
+  $${TOP_SOURCE_DIR}/zlib/inftrees.c \
+  $${TOP_SOURCE_DIR}/zlib/trees.c \
+  $${TOP_SOURCE_DIR}/zlib/uncompr.c \
+  $${TOP_SOURCE_DIR}/zlib/zutil.c
 
 DEFINES += KDSOAP_BUILD_KDSOAP_LIB
 

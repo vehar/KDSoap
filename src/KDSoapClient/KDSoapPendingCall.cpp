@@ -26,6 +26,7 @@
 #include "KDSoapMessageReader_p.h"
 #include <QNetworkReply>
 #include <QDebug>
+#include "zlib.h"
 
 static void debugHelper(const QByteArray &data, const QList<QNetworkReply::RawHeaderPair> &headerList) {
     const QByteArray doDebug = qgetenv("KDSOAP_DEBUG");
@@ -194,12 +195,47 @@ void KDSoapPendingCall::Private::parseReply()
     parsed = true;
 
     // Don't try to read from an aborted (closed) reply
-    const QByteArray data = reply->isOpen() ? reply->readAll() : QByteArray();
+    QByteArray data = reply->isOpen() ? reply->readAll() : QByteArray();
     maybeDebugResponse(data, reply);
 
     if (!data.isEmpty()) {
         KDSoapMessageReader reader;
-        reader.xmlToMessage(data, &replyMessage, nullptr, &replyHeaders, this->soapVersion);
+        if (reply->rawHeader("Content-Type").toLower() == "application/x-gzip") {
+            QByteArray dataToProcess;
+            char *decompressedBuffer = new char[static_cast<unsigned long>(data.length())];
+            z_stream infstream;
+            infstream.zalloc = nullptr;
+            infstream.zfree = nullptr;
+            infstream.opaque = nullptr;
+            infstream.avail_in = static_cast<uInt>(data.length());
+            infstream.next_in = reinterpret_cast<Bytef*>(data.data());
+
+            bool gzipDecompressFailed = false;
+            if (inflateInit2(&infstream, 31) == Z_OK) {
+                do {
+                    infstream.avail_out = static_cast<uInt>(data.length());
+                    infstream.next_out = reinterpret_cast<Bytef*>(decompressedBuffer);
+                    int ret = inflate(&infstream, Z_NO_FLUSH);
+                    if (ret != Z_OK && ret != Z_STREAM_END) {
+                        gzipDecompressFailed = true;
+                        break;
+                    }
+                    dataToProcess.append(decompressedBuffer, data.length() - static_cast<int>(infstream.avail_out));
+                } while (infstream.avail_out == 0);
+                inflateEnd(&infstream);
+                delete[] decompressedBuffer;
+                reader.xmlToMessage(dataToProcess, &replyMessage, nullptr, &replyHeaders, this->soapVersion);
+            } else {
+                gzipDecompressFailed = true;
+            }
+
+            if (gzipDecompressFailed) {
+                QString faultText = QString::fromLatin1("GZIP decompression error");
+                replyMessage.createFaultMessage(QStringLiteral("SOAP-ENV:Server"), faultText, soapVersion);
+            }
+        } else {
+            reader.xmlToMessage(data, &replyMessage, nullptr, &replyHeaders, this->soapVersion);
+        }
     }
 
     if (reply->error()) {
